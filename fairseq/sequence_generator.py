@@ -76,6 +76,7 @@ class SequenceGenerator(object):
                     input['src_lengths'],
                     input['guess_tokens'],
                     input['guess_lengths'],
+                    input['marker'],
                     beam_size=beam_size,
                     maxlen=int(maxlen_a*srclen + maxlen_b),
                     prefix_tokens=s['target'][:, :prefix_size] if prefix_size > 0 else None,
@@ -89,10 +90,10 @@ class SequenceGenerator(object):
                 ref = utils.strip_pad(s['target'].data[i, :], self.pad) if s['target'] is not None else None
                 yield id, src, guess, ref, hypos[i]
 
-    def generate(self, src_tokens, src_lengths, guess_tokens, guess_lengths, beam_size=None, maxlen=None, prefix_tokens=None):
+    def generate(self, src_tokens, src_lengths, guess_tokens, guess_lengths, marker, beam_size=None, maxlen=None, prefix_tokens=None):
         """Generate a batch of translations.""" #------------------------------------------------------------------------------
         with utils.maybe_no_grad():
-            return self._generate(src_tokens, src_lengths, guess_tokens, guess_lengths, beam_size, maxlen, prefix_tokens)
+            return self._generate(src_tokens, src_lengths, guess_tokens, guess_lengths, marker, beam_size, maxlen, prefix_tokens)
 
     def _generate(self, src_tokens, src_lengths, guess_tokens, guess_lengths, marker, beam_size=None, maxlen=None, prefix_tokens=None):
         bsz, srclen = src_tokens.size()
@@ -104,7 +105,6 @@ class SequenceGenerator(object):
         beam_size = min(beam_size, self.vocab_size - 1)
 
         encoder_outs = []
-        marker = [] #---------------------------------------------------------------------------------------------------
         guess_encoder_outs = []
         incremental_states = {}
         for model in self.models:
@@ -121,7 +121,6 @@ class SequenceGenerator(object):
                 src_lengths.repeat(beam_size),
             )
             encoder_outs.append(encoder_out)
-            marker.append(None)
             #--------------------------------------------------------------------------------------------------------
             guess_encoder_out = model.guess_encoder(
                 guess_tokens.repeat(1, beam_size).view(-1, guesslen),
@@ -454,9 +453,9 @@ class SequenceGenerator(object):
         for model, encoder_out, guess_encoder_out in zip(self.models, encoder_outs, guess_encoder_outs):
             with utils.maybe_no_grad():
                 if incremental_states[model] is not None:
-                    decoder_out = list(model.decoder(tokens, encoder_out, guess_encoder_outs, marker, incremental_states[model]))#-----------
+                    decoder_out = list(model.decoder(tokens, encoder_out, guess_encoder_outs, incremental_states[model]))#-----------
                 else:
-                    decoder_out = list(model.decoder(tokens, encoder_out, guess_encoder_outs, marker))#--------------------------------------
+                    decoder_out = list(model.decoder(tokens, encoder_out, guess_encoder_outs))#--------------------------------------
                 decoder_out[0] = decoder_out[0][:, -1, :]
                 #print(decoder_out[0].shape, ' a')
                 attn = decoder_out[1]

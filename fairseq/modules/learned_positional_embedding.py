@@ -22,7 +22,7 @@ class LearnedPositionalEmbedding(nn.Embedding):
         super().__init__(num_embeddings, embedding_dim, padding_idx)
         self.left_pad = left_pad
 
-    def forward(self, input, marker=None, incremental_state=None):
+    def forward(self, input, incremental_state=None, marker=None):
         """Input is expected to be of size [bsz x seqlen]."""
         if incremental_state is not None:
             # positions is the same for every token when decoding a single ste
@@ -30,8 +30,7 @@ class LearnedPositionalEmbedding(nn.Embedding):
         else:
             positions = utils.make_positions(input.data, self.padding_idx, self.left_pad, marker)
 
-        print(positions.shape, positions)
-
+        #print(positions.shape, positions)
         return super().forward(Variable(positions))
 
     def max_positions(self):

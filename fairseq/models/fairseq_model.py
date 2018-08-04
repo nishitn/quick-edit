@@ -49,11 +49,11 @@ class FairseqModel(nn.Module):
     def forward(self, src_tokens, src_lengths, prev_output_tokens, guess_tokens, guess_lengths, marker): #----------------------
         #utils.check_correct(src_tokens[0], guess_tokens[0], prev_output_tokens[0], self.src_dict, self.guess_dict, self.dst_dict)
         #print(src_tokens[0],'\n ', guess_tokens[0])
-        print('1 ')
+        #print('1 ')
         encoder_out = self.encoder(src_tokens, src_lengths)
-        print('2 ')
+        #print('2 ')
         guess_encoder_out = self.guess_encoder(guess_tokens, guess_lengths, marker)  #----------------------------------------------
-        print('3 ')
+        #print('3 ')
         decoder_out = self.decoder(prev_output_tokens, encoder_out, guess_encoder_out)#---------------------------------
         return decoder_out
 

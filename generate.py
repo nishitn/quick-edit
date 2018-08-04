@@ -113,17 +113,18 @@ def main(args):
                                                      escape_unk=True) if has_target else ''
 
             if not args.quiet:
-                print('S-{}\t{}'.format(sample_id, src_str))
-                y=str(src_str)+'\n'
-                source_file.write(y)
+                #print('S-{}\t{}'.format(sample_id, src_str))
                 if has_target:
-                    y=str(target_str)+'\n'
+                    y = str(sample_id) + '= ' + str(target_str) + '\n'
                     target_file.write(y)
-                    print('G-{}\t{}'.format(sample_id, guess_str))
+                    y = str(sample_id) + ' T= ' + str(target_str) + '\n'
+                    detailed_file.write(y)
+                    #print('G-{}\t{}'.format(sample_id, guess_str))
                     print('T-{}\t{}'.format(sample_id, target_str))
                 else:
                     y=str(sample_id)+'checkcheck\n'
                     target_file.write(y)
+                    detailed_file.write(y)
             # Process top predictions
             for i, hypo in enumerate(hypos[:min(len(hypos), args.nbest)]):
                 hypo_tokens, hypo_str, alignment = utils.post_process_prediction(
@@ -135,11 +136,18 @@ def main(args):
                     remove_bpe=args.remove_bpe,
                 )
 
-                if False:#not args.quiet:
+                if not args.quiet:
                     print('H-{}\t{}\t{}'.format(sample_id, hypo['score'], hypo_str))
-                    print('P-{}\t{}'.format(
-                        sample_id,
-                        ' '.join(map(
+                    
+                    y = str(sample_id) + '= ' + str(hypo_str) + '\n'
+                    target_file.write(y)
+                    y = str(sample_id) + 'H= ' + str(hypo_str) + '\n'
+                    detailed_file.write(y)
+                    y = str(sample_id) + '= ' + str(guess_str) + '\n'
+                    target_file.write(y)
+                    y = str(sample_id) + '  G= ' + str(guess_str) + '\n'
+                    detailed_file.write(y)
+                    print('P-{}\t{}'.format( sample_id, ' '.join(map(
                             lambda x: '{:.4f}'.format(x),
                             hypo['positional_scores'].tolist(),
                         ))
@@ -170,8 +178,8 @@ def main(args):
 if __name__ == '__main__':
     parser = options.get_generation_parser()
     args = parser.parse_args()
-    source_file = open('logs/source.txt', 'a') #----------------------------------------------------------------------------------------
-    target_file = open('logs/translation.txt', 'a') #-----------------------------------------------------------------------------------
+    detailed_file = open('logs/detailed_data.txt', 'a') #-----------------------------------------------------------------------------------
+    target_file = open('logs/translation.txt', 'a') #-------------------------------------------------------------------------------
     main(args)
-    source_file.close()
+    detailed_file.close()
     target_file.close()

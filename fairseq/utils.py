@@ -310,7 +310,7 @@ def post_process_prediction(hypo_tokens, src_str, alignment, align_dict, dst_dic
     return hypo_tokens, hypo_str, alignment
 
 
-def make_positions(tensor, padding_idx, left_pad, marker):
+def make_positions(tensor, padding_idx, left_pad, marker=None):
     """Replace non-padding symbols with their position numbers.
 
     Position numbers begin at padding_idx+1.

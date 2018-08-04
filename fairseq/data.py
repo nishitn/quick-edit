@@ -198,8 +198,24 @@ class sharded_iterator(object):
             if i % self.num_shards == self.shard_id:
                 yield v
 
-def check_missing(guess, target, j, count):
-    
+def marking(guess, target, j, k, marker):
+    while(j < guess.size(0) and k < target.size(0)):
+        if(guess[j] != target[k]):
+            marker[j]=1
+            if(k+1 < target.size(0) and guess[j]==target[k+1]):
+                k+=1
+            elif(k+2 < target.size(0) and guess[j]==target[k+2]):
+                k+=2
+            elif(j+1 < guess.size(0) and guess[j+1]==target[k]):
+                j+=1
+            elif(j+2 < guess.size(0) and guess[j+2]==target[k]):
+                j+=2
+        j+=1
+        k+=1
+#    print(guess)
+#    print(target)
+#    print(marker)
+    return marker
 
 
 def mark_token(guess_tokens, target, ntokens):
@@ -210,8 +226,9 @@ def mark_token(guess_tokens, target, ntokens):
         for j in range (guess_tokens[i].shape[0]):
             if(guess_tokens[i,j]==1):
                 count += 1
+            else:
                 break
-                
+        marker[i] = marking(guess_tokens[i], target[i], j, j-count, marker[i])        
     return marker
 
 class LanguagePairDataset(torch.utils.data.Dataset):

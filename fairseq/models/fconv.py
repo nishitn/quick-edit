@@ -248,7 +248,7 @@ class FConvGuessEncoder(FairseqGuessEncoder):
     def forward(self, guess_tokens, guess_lengths, marker):
         # embed tokens and positions
         #print(self.embed_positions(guess_tokens)[0,0])
-        x = self.embed_tokens(guess_tokens) + self.embed_positions(guess_tokens, marker)
+        x = self.embed_tokens(guess_tokens) + self.embed_positions(guess_tokens, marker=marker)
         x = F.dropout(x, p=self.dropout, training=self.training)
         guess_embedding = x #--------------------------------------------------------------------------------------------
 

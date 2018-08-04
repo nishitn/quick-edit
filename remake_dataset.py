@@ -17,28 +17,20 @@ import re
 def remake_dict(dict):
     i=0
     file = open('logs/remake.txt', 'a')
-    with open('data/iwslt14.tokenized.de-en/test.en', 'r') as f:
+    with open('logs/g_translation.txt', 'r') as f:
         for line in f:
-            i+=1
-            if(i>5):
+            i += 1
+            if False: #(i > 5):
                 break
             words = tokenize_line(line)
             for word in words:
-                
-                if(check(word,dict)):
-                    file.write(word)
-                    file.write(' ')
-                    continue
+                if(len(word) <= 15):
+                    broken_word = run(word,dict)
                 else:
-                    print(word)
-                    a, b = find_subword(word, dict)
-                    if b is None:
-                        a, b= three_sub_words(word, dict)
-                    y = a+' '+b+' '
-                    print(y)
-                    file.write(y)
+                    broken_word = '%'+word+' '
+                file.write(broken_word)
             file.write('\n')
-    file.close
+    file.close()
 
 SPACE_NORMALIZER = re.compile("\s+")
 def tokenize_line(line):
@@ -53,36 +45,68 @@ def check(word,dict):
     else:
         return True
 
-def three_sub_words(word,dict):
-    l=len(word)
-    while(l>0):
-        a = word[:l-1] + '@@'
-        b = word[l-1:]
-        if(check(a, dict)):
-            b, c = find_subword(b, dict)
-            if c is not None:
-                b = b+' '+c
-                break
-        l-=1
-    if(l==0):
-    	print('OHHHHHHHHH')
-    	a=word
-    	b='OHhhh'
-    return a, b
+dict = Dictionary.load('logs/dict.en.txt')
 
+list_of_splits = []
 
-def find_subword(word, dict):
-    l=len(word)
-    while(l>0):
-        a = word[:l-1] + '@@'
-        b = word[l-1:]
-        if(check(a,dict) and check(b,dict)):
-            break
-        l-=1
-    if(l==0):
-    	a=None
-    	b=None    
-    return a, b
+iterator = 0
 
-dict = Dictionary.load('data-bin/iwslt14.tokenized.de-en/dict.en.txt')
+def next_word():
+
+    global iterator
+
+    if(iterator == len(list_of_splits)):
+        return "<UNK>"
+    current_word = list_of_splits[iterator]
+
+    for i in range(len(current_word)-1,0,-1):
+
+        split_possible = False
+        if current_word[i] != ' ' and current_word[i-1] != ' ':
+            new_word_to_append = current_word[:i] + ' ' + current_word[i:]
+            split_possible = True
+
+        if split_possible and not new_word_to_append in list_of_splits and new_word_to_append.count(' ') <= 5:
+            list_of_splits.append(new_word_to_append)
+            
+    iterator += 1
+
+    if iterator > len(list_of_splits):
+        return "<UNK>"    
+    else:
+        return list_of_splits[iterator-1]
+
+def run(word, dict):
+
+    global list_of_splits, iterator
+
+    list_of_splits = []
+    iterator = 0    
+    word.strip('\n')
+    list_of_splits.append(word)
+    
+    print(word)
+    while 1:
+        check_word = next_word()
+        if check_word != "<UNK>":
+            list_of_current_word = check_word.split(' ')
+            for j in range(len(list_of_current_word)-1):
+                list_of_current_word[j] = list_of_current_word[j] + '@@'
+
+            found_all_parts = True
+
+            for j in range(len(list_of_current_word)):
+                if not check(list_of_current_word[j],dict):
+                    found_all_parts = False
+
+            if found_all_parts:
+                output = ''
+                for sub_words in list_of_current_word:
+                    output += sub_words + ' '
+
+                return output
+        else:
+            y = '<UNK>' + word + ' '
+            return y
+
 remake_dict(dict)
