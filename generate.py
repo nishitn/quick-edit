@@ -12,6 +12,7 @@ from fairseq import bleu, data, options, progress_bar, tokenizer, utils
 from fairseq.meters import StopwatchMeter, TimeMeter
 from fairseq.sequence_generator import SequenceGenerator
 from fairseq.sequence_scorer import SequenceScorer
+from nltk.translate.bleu_score import sentence_bleu
 
 
 def main(args):
@@ -96,7 +97,7 @@ def main(args):
                 t, maxlen_a=args.max_len_a, maxlen_b=args.max_len_b,
                 cuda=use_cuda, timer=gen_timer, prefix_size=args.prefix_size)
         wps_meter = TimeMeter()
-        for sample_id, src_tokens, guess_tokens, target_tokens, hypos in translations:
+        for sample_id, src_tokens, guess_tokens, target_tokens, hypos, marker in translations:
             # Process input and ground truth
             has_target = target_tokens is not None
             target_tokens = target_tokens.int().cpu() if has_target else None
@@ -111,19 +112,16 @@ def main(args):
                 target_str = dataset.dst_dict.string(target_tokens,
                                                      args.remove_bpe,
                                                      escape_unk=True) if has_target else ''
-
             if not args.quiet:
                 #print('S-{}\t{}'.format(sample_id, src_str))
                 if has_target:
-                    y = str(sample_id) + '= ' + str(target_str) + '\n'
-                    target_file.write(y)
-                    y = str(sample_id) + ' T= ' + str(target_str) + '\n'
+                    y = str(sample_id.numpy()) + ' T= ' + str(target_str) + '\n'
                     detailed_file.write(y)
-                    #print('G-{}\t{}'.format(sample_id, guess_str))
+                    
+                    print('G-{}\t{}'.format(sample_id, guess_str))
                     print('T-{}\t{}'.format(sample_id, target_str))
                 else:
-                    y=str(sample_id)+'checkcheck\n'
-                    target_file.write(y)
+                    y=str(sample_id.numpy())+'checkcheck\n'
                     detailed_file.write(y)
             # Process top predictions
             for i, hypo in enumerate(hypos[:min(len(hypos), args.nbest)]):
@@ -135,27 +133,27 @@ def main(args):
                     dst_dict=dataset.dst_dict,
                     remove_bpe=args.remove_bpe,
                 )
+#                get_bleu(target_str, hypo_str)
 
                 if not args.quiet:
                     print('H-{}\t{}\t{}'.format(sample_id, hypo['score'], hypo_str))
                     
-                    y = str(sample_id) + '= ' + str(hypo_str) + '\n'
-                    target_file.write(y)
-                    y = str(sample_id) + 'H= ' + str(hypo_str) + '\n'
+                    guess_str = make_bold(guess_str, marker)
+
+                    y = str(sample_id.numpy()) + ' G= ' + str(guess_str) + '\n'
                     detailed_file.write(y)
-                    y = str(sample_id) + '= ' + str(guess_str) + '\n'
-                    target_file.write(y)
-                    y = str(sample_id) + '  G= ' + str(guess_str) + '\n'
+                    y = str(sample_id.numpy()) + ' H= ' + str(hypo_str) + '\n'
                     detailed_file.write(y)
-                    print('P-{}\t{}'.format( sample_id, ' '.join(map(
-                            lambda x: '{:.4f}'.format(x),
-                            hypo['positional_scores'].tolist(),
-                        ))
-                    ))
-                    print('A-{}\t{}'.format(
-                        sample_id,
-                        ' '.join(map(lambda x: str(utils.item(x)), alignment))
-                           ))
+
+#                   print('P-{}\t{}'.format( sample_id, ' '.join(map(
+#                            lambda x: '{:.4f}'.format(x),
+#                            hypo['positional_scores'].tolist(),
+#                        ))
+#                    ))
+#                    print('A-{}\t{}'.format(
+#                        sample_id,
+#                        ' '.join(map(lambda x: str(utils.item(x)), alignment))
+#                           ))
 
                 # Score only the top hypothesis
                 if has_target and i == 0:
@@ -174,6 +172,25 @@ def main(args):
     if has_target:
         print('| Generate {} with beam={}: {}'.format(args.gen_subset, args.beam, scorer.result_string()))
 
+
+def make_bold(guess_str, marker):
+    guess_array = guess_str.split(' ')
+    guess_str = ''
+
+    for i in range (marker.size(0) - 1):
+        if(marker[i] == 1):
+            guess_str += '<b>' + guess_array[i] + '</b> '
+        else:
+            guess_str += guess_array[i] + ' '
+
+    return guess_str
+
+def get_bleu(ref, can):
+    reference = ref.split(' ')
+    candidate = can.split(' ')
+    print(reference, candidate, end = ' ')
+    score = sentence_bleu(reference, candidate)
+    print(score)
 
 if __name__ == '__main__':
     parser = options.get_generation_parser()

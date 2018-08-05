@@ -79,6 +79,12 @@ class Scorer(object):
                    for p in self.precision()[:order])
         return self.brevity() * math.exp(psum / order) * 100
 
+    def print_score(self, order=4):
+        for p in self.precision()[:order]:
+            if p > 0:
+                x = math.log(p)
+        print(self.brevity() * math.exp(x / order) * 100)
+
     def precision(self):
         def ratio(a, b):
             return a / b if b > 0 else 0

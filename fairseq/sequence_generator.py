@@ -86,9 +86,10 @@ class SequenceGenerator(object):
             for i, id in enumerate(s['id'].data):
                 src = input['src_tokens'].data[i, :]
                 guess = input['guess_tokens'].data[i, :]
+                marker = input['marker'].data[i, :]
                 # remove padding from ref
                 ref = utils.strip_pad(s['target'].data[i, :], self.pad) if s['target'] is not None else None
-                yield id, src, guess, ref, hypos[i]
+                yield id, src, guess, ref, hypos[i], marker
 
     def generate(self, src_tokens, src_lengths, guess_tokens, guess_lengths, marker, beam_size=None, maxlen=None, prefix_tokens=None):
         """Generate a batch of translations.""" #------------------------------------------------------------------------------
