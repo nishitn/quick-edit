@@ -220,14 +220,7 @@ class FConvGuessEncoder(FairseqGuessEncoder):
         if embed_dict:
             self.embed_tokens = utils.load_embedding(embed_dict, self.dictionary, self.embed_tokens)
 
-        self.embed_positions0 = PositionalEmbedding(
-            max_positions,
-            embed_dim,
-            padding_idx,
-            left_pad=LanguagePairDataset.LEFT_PAD_SOURCE,
-        )
-
-        self.embed_positions1 = PositionalEmbedding(
+        self.embed_positions = PositionalEmbedding(
             max_positions,
             embed_dim,
             padding_idx,
@@ -255,7 +248,7 @@ class FConvGuessEncoder(FairseqGuessEncoder):
     def forward(self, guess_tokens, guess_lengths, marker):
         # embed tokens and positions
         #print(self.embed_positions(guess_tokens)[0,0])
-        x = self.embed_tokens(guess_tokens) + self.embed_positions0(guess_tokens, marker=marker, mark = 0) + self.embed_positions1(guess_tokens, marker=marker, mark = 1)
+        x = self.embed_tokens(guess_tokens) + self.embed_positions(guess_tokens, marker=marker)
         x = F.dropout(x, p=self.dropout, training=self.training)
         guess_embedding = x #--------------------------------------------------------------------------------------------
 
@@ -296,7 +289,7 @@ class FConvGuessEncoder(FairseqGuessEncoder):
 
     def max_positions(self):
         """Maximum input length supported by the encoder."""
-        return self.embed_positions0.max_positions()
+        return self.embed_positions.max_positions()
 
 
 class AttentionLayer(nn.Module):
@@ -373,7 +366,6 @@ class FConvDecoder(FairseqIncrementalDecoder):
         self.projections = nn.ModuleList()
         self.convolutions = nn.ModuleList()
         self.attention = nn.ModuleList()
-        self.attention_guess = nn.ModuleList()
         for i, (out_channels, kernel_size) in enumerate(convolutions):
             self.projections.append(Linear(in_channels, out_channels)
                                     if in_channels != out_channels else None)
@@ -382,8 +374,6 @@ class FConvDecoder(FairseqIncrementalDecoder):
                                  padding=(kernel_size - 1), dropout=dropout)
             )
             self.attention.append(AttentionLayer(out_channels, embed_dim)
-                                  if attention[i] else None)
-            self.attention_guess.append(AttentionLayer(out_channels, embed_dim)
                                   if attention[i] else None)
             in_channels = out_channels
         self.fc2 = Linear(in_channels, out_embed_dim)
@@ -416,8 +406,7 @@ class FConvDecoder(FairseqIncrementalDecoder):
         avg_attn_scores1=None
         avg_attn_scores2 = None
         num_attn_layers = len(self.attention)
-        num_attn_layers_guess = len(self.attention_guess)
-        for proj, conv, attention, attention_guess in zip(self.projections, self.convolutions, self.attention, self.attention_guess):
+        for proj, conv, attention in zip(self.projections, self.convolutions, self.attention):
             residual = x if proj is None else proj(x)
 
             x = F.dropout(x, p=self.dropout, training=self.training)
@@ -429,12 +418,12 @@ class FConvDecoder(FairseqIncrementalDecoder):
                 x = self._transpose_if_training(x, incremental_state)
                 #---------------------------------------------------------------------------------------------------------------
                 a_e, attn_scores1 = attention(x, target_embedding, (encoder_a, encoder_b))
-                a_g, attn_scores2 = attention_guess(x, target_embedding, (guess_encoder_a, guess_encoder_b))
+                a_g, attn_scores2 = attention(x, target_embedding, (guess_encoder_a, guess_encoder_b))
                 
                 x=0.5*(a_e+a_g)
 
                 attn_scores1 = attn_scores1 / num_attn_layers
-                attn_scores2 = attn_scores2 / num_attn_layers_guess
+                attn_scores2 = attn_scores2 / num_attn_layers
                 if avg_attn_scores1 is None:
                     avg_attn_scores1 = attn_scores1
                 else:

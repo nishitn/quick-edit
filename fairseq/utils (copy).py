@@ -310,7 +310,7 @@ def post_process_prediction(hypo_tokens, src_str, alignment, align_dict, dst_dic
     return hypo_tokens, hypo_str, alignment
 
 
-def make_positions(tensor, padding_idx, left_pad, marker=None, mark = 2):
+def make_positions(tensor, padding_idx, left_pad, marker=None):
     """Replace non-padding symbols with their position numbers.
 
     Position numbers begin at padding_idx+1.
@@ -325,36 +325,20 @@ def make_positions(tensor, padding_idx, left_pad, marker=None, mark = 2):
     if make_positions.range_buf.numel() < max_pos:
         torch.arange(padding_idx + 1, max_pos, out=make_positions.range_buf)
     mask = tensor.ne(padding_idx)
-#    print('Po = ', mask[0])
+    positions = make_positions.range_buf[:tensor.size(1)].expand_as(tensor)
+    if left_pad:
+        positions = positions - mask.size(1) + mask.long().sum(dim=1).unsqueeze(1)
+    y = tensor.clone().masked_scatter_(mask, positions[mask])
 
     if marker is not None:
+        x=y
         for i in range(marker.size(0)):
             for j in range(marker.size(1)):
-                if (marker[i,j]==0 and mark == 0):
-                    mask[i,j] = 0 
-                elif (marker[i,j]==1 and mark == 1):
-                    mask[i,j] = 0 
-#        print('A = ', mask[0])
-#        print('M = ', marker[0])
+                if (marker[i,j]==1):
+                    x[i,j]=x[i,j]+200
+        y=x
     
-        positions = torch.zeros(mask.shape, dtype = torch.long).cuda()
-
-        for i in range(mask.size(0)):
-            k=2
-            for j in range(mask.size(1)):
-                if(mask[i,j] == 0):
-                    positions[i,j] = 1
-                else:
-                    positions[i,j] = k
-                    k += 1
-    else:
-        positions = make_positions.range_buf[:tensor.size(1)].expand_as(tensor)
-        if left_pad:
-            positions = positions - mask.size(1) + mask.long().sum(dim=1).unsqueeze(1)
-        positions = tensor.clone().masked_scatter_(mask, positions[mask])
-#    print('P = ', positions[0])
-
-    return positions
+    return y
 
 def strip_pad(tensor, pad):
     return tensor[tensor.ne(pad)]
