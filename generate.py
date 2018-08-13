@@ -7,7 +7,7 @@
 # can be found in the PATENTS file in the same directory.
 
 import torch
-
+import numpy
 from fairseq import bleu, data, options, progress_bar, tokenizer, utils
 from fairseq.meters import StopwatchMeter, TimeMeter
 from fairseq.sequence_generator import SequenceGenerator
@@ -87,6 +87,7 @@ def main(args):
 
     # Generate and compute BLEU score
     scorer = bleu.Scorer(dataset.dst_dict.pad(), dataset.dst_dict.eos(), dataset.dst_dict.unk())
+    check = [] #------------------------------------------------------------------------------------------------------
     num_sentences = 0
     has_target = True
     with progress_bar.build_progress_bar(args, itr) as t:
@@ -115,13 +116,13 @@ def main(args):
             if not args.quiet:
                 #print('S-{}\t{}'.format(sample_id, src_str))
                 if has_target:
-                    y = str(sample_id.numpy()) + ' T= ' + str(target_str) + '\n'
+                    y = str(sample_id.cpu().numpy()) + ' T= ' + str(target_str) + '\n'
                     detailed_file.write(y)
                     
                     print('G-{}\t{}'.format(sample_id, guess_str))
                     print('T-{}\t{}'.format(sample_id, target_str))
                 else:
-                    y=str(sample_id.numpy())+'checkcheck\n'
+                    y=str(sample_id.cpu().numpy())+'checkcheck\n'
                     detailed_file.write(y)
             # Process top predictions
             for i, hypo in enumerate(hypos[:min(len(hypos), args.nbest)]):
@@ -133,16 +134,18 @@ def main(args):
                     dst_dict=dataset.dst_dict,
                     remove_bpe=args.remove_bpe,
                 )
-#                get_bleu(target_str, hypo_str)
 
                 if not args.quiet:
                     print('H-{}\t{}\t{}'.format(sample_id, hypo['score'], hypo_str))
                     
+                    guess_score = get_bleu(target_str, remove_pad(guess_str)) 
+                    hypo_score = get_bleu(target_str, hypo_str)
+                    check.append(hypo_score)
                     guess_str = make_bold(guess_str, marker)
 
-                    y = str(sample_id.numpy()) + ' G= ' + str(guess_str) + '\n'
+                    y = str(sample_id.cpu().numpy()) + ' ' + str(guess_score) + ' G= ' + str(guess_str) + '\n'
                     detailed_file.write(y)
-                    y = str(sample_id.numpy()) + ' H= ' + str(hypo_str) + '\n'
+                    y = str(sample_id.cpu().numpy()) + ' ' + str(hypo_score) + ' H= ' + str(hypo_str) + '\n'
                     detailed_file.write(y)
 
 #                   print('P-{}\t{}'.format( sample_id, ' '.join(map(
@@ -169,7 +172,12 @@ def main(args):
 
     print('| Translated {} sentences ({} tokens) in {:.1f}s ({:.2f} tokens/s)'.format(
         num_sentences, gen_timer.n, gen_timer.sum, 1. / gen_timer.avg))
+    summ = 0
     if has_target:
+        for i in check:
+            summ +=i
+        summ = summ/len(check)
+        print('| Check BLEU =', summ)
         print('| Generate {} with beam={}: {}'.format(args.gen_subset, args.beam, scorer.result_string()))
 
 
@@ -185,18 +193,27 @@ def make_bold(guess_str, marker):
 
     return guess_str
 
+def remove_pad(guess_str):
+    guess_array = guess_str.split(' ')
+    guess_str = ''
+    for word in guess_array:
+        if(word == '<pad>'):
+            continue
+        guess_str += word + ' '
+
+    return guess_str
+
 def get_bleu(ref, can):
-    reference = ref.split(' ')
+    reference = [ref.split(' ')]
     candidate = can.split(' ')
-    print(reference, candidate, end = ' ')
+#    print(reference, candidate, end = ' ')
     score = sentence_bleu(reference, candidate)
-    print(score)
+    score = numpy.around(score, decimals = 5)
+    return score
 
 if __name__ == '__main__':
     parser = options.get_generation_parser()
     args = parser.parse_args()
     detailed_file = open('logs/detailed_data.txt', 'a') #-----------------------------------------------------------------------------------
-    target_file = open('logs/translation.txt', 'a') #-------------------------------------------------------------------------------
     main(args)
     detailed_file.close()
-    target_file.close()
